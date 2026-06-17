@@ -1,5 +1,14 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey, type Component, type Focusable, type TUI } from "@earendil-works/pi-tui";
+import {
+	Key,
+	matchesKey,
+	truncateToWidth,
+	visibleWidth,
+	wrapTextWithAnsi,
+	type Component,
+	type Focusable,
+	type TUI,
+} from "@earendil-works/pi-tui";
 import { MIN_SECRET_LENGTH } from "./secrets.js";
 
 const PASTE_START = "\x1b[200~";
@@ -109,21 +118,27 @@ export class MaskedInput implements Component, Focusable {
 	}
 
 	render(width: number): string[] {
+		if (width <= 0) return [""];
+
 		const t = this.theme;
-		const maxBullets = Math.max(8, width - 16);
-		const bullets = "•".repeat(Math.min(this.value.length, maxBullets));
+		const fit = (line: string) => truncateToWidth(line, width);
+		const wrap = (line: string) => wrapTextWithAnsi(line, width).map(fit);
+
 		const cursor = this.focused ? t.fg("accent", "▎") : " ";
+		const countText = t.fg("dim", ` (${this.value.length} chars)`);
+		const bulletBudget = Math.max(0, width - visibleWidth("  ") - visibleWidth(cursor) - visibleWidth(countText));
+		const bullets = "•".repeat(Math.min(this.value.length, bulletBudget));
 		const lines = [
-			t.fg("accent", `Secret requested: ${this.name}`),
-			t.fg("muted", `Reason: ${this.reason}`),
+			...wrap(t.fg("accent", `Secret requested: ${this.name}`)),
+			...wrap(t.fg("muted", `Reason: ${this.reason}`)),
 			"",
-			`  ${bullets}${cursor}${t.fg("dim", ` (${this.value.length} chars)`)}`,
+			fit(`  ${bullets}${cursor}${countText}`),
 			"",
 		];
 		if (this.error) {
-			lines.push(t.fg("error", `  ${this.error}`), "");
+			lines.push(...wrap(t.fg("error", `  ${this.error}`)), "");
 		}
-		lines.push(t.fg("muted", "  Paste or type · Enter submit · Esc decline · Ctrl+U clear"));
+		lines.push(fit(t.fg("muted", "  Paste or type · Enter submit · Esc decline · Ctrl+U clear")));
 		return lines;
 	}
 
