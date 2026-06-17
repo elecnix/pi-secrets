@@ -19,7 +19,8 @@ const requestSecretParams = Type.Object({
 		description: "UPPER_SNAKE_CASE environment variable name for the secret, e.g. STRIPE_API_KEY",
 	}),
 	reason: Type.String({
-		description: "One sentence shown to the user: what the secret is and why it is needed",
+		description:
+			"Short human-readable reason shown to the user (ideally under 120 chars): what the secret unlocks and why it is needed. Do not include sensitive values.",
 	}),
 });
 
@@ -78,6 +79,7 @@ export default function piSecrets(pi: ExtensionAPI) {
 		promptSnippet: "Ask the user for a secret via a masked prompt; the value becomes $NAME in bash and never appears in chat",
 		promptGuidelines: [
 			"Use request_secret when a task needs a credential only the user can provide. Never ask the user to paste secrets into the chat.",
+			"Keep request_secret reasons concise and easy for the user to scan: one short sentence, ideally under 120 characters. Put longer context in normal assistant text before calling the tool.",
 			"After request_secret succeeds, use the secret strictly via its environment variable (e.g. $STRIPE_API_KEY) in bash; never print or echo its value.",
 		],
 		parameters: requestSecretParams,

@@ -1,15 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import {
-	Key,
-	matchesKey,
-	truncateToWidth,
-	visibleWidth,
-	wrapTextWithAnsi,
-	type Component,
-	type Focusable,
-	type TUI,
-} from "@earendil-works/pi-tui";
+import { Key, matchesKey, type Component, type Focusable, type TUI } from "@earendil-works/pi-tui";
 import { MIN_SECRET_LENGTH } from "./secrets.js";
+import { fitLineToWidth, remainingVisibleWidth, wrapLineToWidth } from "./tui-width.js";
 
 const PASTE_START = "\x1b[200~";
 const PASTE_END = "\x1b[201~";
@@ -121,12 +113,12 @@ export class MaskedInput implements Component, Focusable {
 		if (width <= 0) return [""];
 
 		const t = this.theme;
-		const fit = (line: string) => truncateToWidth(line, width);
-		const wrap = (line: string) => wrapTextWithAnsi(line, width).map(fit);
+		const fit = (line: string) => fitLineToWidth(line, width);
+		const wrap = (line: string) => wrapLineToWidth(line, width);
 
 		const cursor = this.focused ? t.fg("accent", "▎") : " ";
 		const countText = t.fg("dim", ` (${this.value.length} chars)`);
-		const bulletBudget = Math.max(0, width - visibleWidth("  ") - visibleWidth(cursor) - visibleWidth(countText));
+		const bulletBudget = remainingVisibleWidth(width, "  ", cursor, countText);
 		const bullets = "•".repeat(Math.min(this.value.length, bulletBudget));
 		const lines = [
 			...wrap(t.fg("accent", `Secret requested: ${this.name}`)),
