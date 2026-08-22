@@ -22,6 +22,12 @@ const requestSecretParams = Type.Object({
 		description:
 			"Short human-readable reason shown to the user (ideally under 120 chars): what the secret unlocks and why it is needed. Do not include sensitive values.",
 	}),
+	refresh: Type.Optional(
+		Type.Boolean({
+			description:
+				"Set true to discard the currently held value for this name (if any) and prompt for a fresh one. Use when the cached secret is stale or was rejected by the service.",
+		}),
+	),
 });
 
 export default function piSecrets(pi: ExtensionAPI) {
@@ -75,12 +81,14 @@ export default function piSecrets(pi: ExtensionAPI) {
 		description:
 			"Ask the user for a secret (API key, token, password) via a local masked prompt. " +
 			"The value never enters the conversation: it becomes available as an environment variable in subsequent bash commands, " +
-			"and the tool result only reports the name and length.",
+			"and the tool result only reports the name and length. " +
+			"Pass refresh: true to discard a stale held value and prompt for a fresh one.",
 		promptSnippet: "Ask the user for a secret via a masked prompt; the value becomes $NAME in bash and never appears in chat",
 		promptGuidelines: [
 			"Use request_secret when a task needs a credential only the user can provide. Never ask the user to paste secrets into the chat.",
 			"Keep request_secret reasons concise and easy for the user to scan: one short sentence, ideally under 120 characters. Put longer context in normal assistant text before calling the tool.",
 			"After request_secret succeeds, use the secret strictly via its environment variable (e.g. $STRIPE_API_KEY) in bash; never print or echo its value.",
+			"If the user says a previously provided secret was wrong, mispasted, or rejected by the service, call request_secret again with refresh: true instead of working around the cache with a different variable name.",
 		],
 		parameters: requestSecretParams,
 
@@ -88,6 +96,14 @@ export default function piSecrets(pi: ExtensionAPI) {
 			const name = params.name.trim();
 			const invalid = validateName(name);
 			if (invalid) throw new Error(invalid);
+
+			// refresh: drop any tracked value (and the env var for captured ones) so the
+			// flow below prompts for a fresh value instead of reusing the stale one.
+			if (params.refresh) {
+				const prior = store.record(name);
+				if (prior) clearSecret(prior);
+				updateStatus(ctx);
+			}
 
 			// Already tracked this process → silent reuse.
 			const existing = store.record(name);
@@ -101,7 +117,7 @@ export default function piSecrets(pi: ExtensionAPI) {
 			// Present in the inherited environment → confirm interactively; reuse silently
 			// headless (the model can already read the environment there; tracking it at
 			// least brings the value under redaction).
-			const inherited = process.env[name];
+			const inherited = params.refresh ? undefined : process.env[name];
 			if (inherited) {
 				if (ctx.hasUI) {
 					const ok = await ctx.ui.confirm(
