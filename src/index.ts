@@ -91,6 +91,12 @@ export default function piSecrets(pi: ExtensionAPI) {
 			"If the user says a previously provided secret was wrong, mispasted, or rejected by the service, call request_secret again with refresh: true instead of working around the cache with a different variable name.",
 		],
 		parameters: requestSecretParams,
+		// The TUI has a single custom-component slot, so overlapping prompts destroy
+		// each other: the second `ctx.ui.custom()` replaces the first component, whose
+		// promise then never settles and leaves the turn hanging with that secret
+		// uncaptured. Sequential mode makes pi await this tool call before starting the
+		// next one in the batch, so parallel requests become successive prompts.
+		executionMode: "sequential",
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const name = params.name.trim();
