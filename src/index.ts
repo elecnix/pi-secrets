@@ -64,12 +64,19 @@ export default function piSecrets(pi: ExtensionAPI) {
 		syncSeedEnv();
 	};
 
-	const usageText = (name: string, length: number, how: string) =>
+	// A reused Secret is the one case where the model needs to hear about refresh:
+	// it usually repeats the call because the value it already has stopped working,
+	// and without this pointer the only visible escape is a differently-named ask.
+	const REFRESH_HINT =
+		"- If this value is wrong, stale, or was rejected by the service, call request_secret again with refresh: true to replace it.";
+
+	const usageText = (name: string, length: number, how: string, hint?: string) =>
 		[
 			`Secret ${name} ${how} (${length} chars). It is available as $${name} in bash commands.`,
 			`- Use it only by reference, e.g. curl -H "Authorization: Bearer $${name}"`,
 			`- To place it in a file: echo "${name}=$${name}" >> .env`,
 			`- Never print, echo, or log the value; any output containing it is redacted to [REDACTED:${name}] before you see it.`,
+			...(hint ? [hint] : []),
 		].join("\n");
 
 	const declinedError = (name: string) =>
@@ -115,7 +122,9 @@ export default function piSecrets(pi: ExtensionAPI) {
 			const existing = store.record(name);
 			if (existing) {
 				return {
-					content: [{ type: "text" as const, text: usageText(name, existing.length, "is already available") }],
+					content: [
+						{ type: "text" as const, text: usageText(name, existing.length, "is already available", REFRESH_HINT) },
+					],
 					details: { name, source: existing.source, reused: true },
 				};
 			}
@@ -136,7 +145,12 @@ export default function piSecrets(pi: ExtensionAPI) {
 				syncSeedEnv();
 				updateStatus(ctx);
 				return {
-					content: [{ type: "text" as const, text: usageText(name, inherited.length, "reused from your environment") }],
+					content: [
+						{
+							type: "text" as const,
+							text: usageText(name, inherited.length, "reused from your environment", REFRESH_HINT),
+						},
+					],
 					details: { name, source: "inherited", reused: true },
 				};
 			}
