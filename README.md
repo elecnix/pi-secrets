@@ -36,6 +36,8 @@ Or try it ephemerally: `pi -e npm:pi-secrets`
 | Nothing anywhere, headless | Tool errors with guidance to export the variable or run interactively |
 | You press Esc / decline | Tool errors telling the model not to re-ask |
 
+A reuse result also names the way out: it tells the model to call `request_secret` again with `refresh: true` if the value it already holds is wrong or was rejected, so a failing credential does not push it into asking for the same secret under a new variable name.
+
 ### Lifetime
 
 Secrets live for the **pi process lifetime**: they survive session switches (`/new`), and vanish when pi exits. Nothing persists to disk. After a restart the model simply asks again.
